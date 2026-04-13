@@ -17,6 +17,48 @@ const getBaseUrl = (): string => {
 
 export const getEndpoint = (path: string): string => getBaseUrl() + path;
 
+const consumeSSE = async (
+  response: Response,
+  onEvent: (event: string, data: any) => void,
+): Promise<void> => {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('text/event-stream')) {
+    const reader = response.body?.getReader();
+    if (!reader) return;
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+
+      for (const part of parts) {
+        let eventName = 'message';
+        let eventData = '';
+        for (const line of part.split('\n')) {
+          if (line.startsWith('event: ')) eventName = line.slice(7).trim();
+          else if (line.startsWith('data: ')) eventData = line.slice(6);
+        }
+        if (eventData) {
+          try {
+            onEvent(eventName, JSON.parse(eventData));
+          } catch {
+            onEvent(eventName, eventData);
+          }
+        }
+      }
+    }
+  } else {
+    const data = await response.json();
+    onEvent('complete', data);
+  }
+};
+
 export const getAssets = async (companyId: string) => {
   try {
     const resp = await axios.get(getEndpoint(`/api/v1/assets/${companyId}`));
@@ -54,42 +96,45 @@ export const startAnalysisSSE = (
         return;
       }
 
-      const contentType = response.headers.get('content-type') || '';
-
-      if (contentType.includes('text/event-stream')) {
-        const reader = response.body?.getReader();
-        if (!reader) return;
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          const parts = buffer.split('\n\n');
-          buffer = parts.pop() || '';
-
-          for (const part of parts) {
-            let eventName = 'message';
-            let eventData = '';
-            for (const line of part.split('\n')) {
-              if (line.startsWith('event: ')) eventName = line.slice(7).trim();
-              else if (line.startsWith('data: ')) eventData = line.slice(6);
-            }
-            if (eventData) {
-              try {
-                onEvent(eventName, JSON.parse(eventData));
-              } catch {
-                onEvent(eventName, eventData);
-              }
-            }
-          }
-        }
-      } else {
-        const data = await response.json();
-        onEvent('complete', data);
+      await consumeSSE(response, onEvent);
+    })
+    .catch((err) => {
+      if (err.name !== 'AbortError') {
+        onError(err);
       }
+    });
+
+  return controller;
+};
+
+export const startDocumentAnalysisSSE = (
+  file: File,
+  companyName: string,
+  forceRefresh: boolean,
+  onEvent: (event: string, data: any) => void,
+  onError: (error: any) => void,
+): AbortController => {
+  const controller = new AbortController();
+  const url = getEndpoint('/api/v1/documents/analyze');
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('company_name', companyName);
+  formData.append('force_refresh', String(forceRefresh));
+
+  fetch(url, {
+    method: 'POST',
+    body: formData,
+    signal: controller.signal,
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        const text = await response.text();
+        onError(new Error(`HTTP ${response.status}: ${text}`));
+        return;
+      }
+
+      await consumeSSE(response, onEvent);
     })
     .catch((err) => {
       if (err.name !== 'AbortError') {

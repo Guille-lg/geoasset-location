@@ -19,9 +19,59 @@
           @keydown.enter.prevent="startAnalysis"
         >
           <template #append>
-            <v-btn icon size="small" color="primary" class="submit-icon" :disabled="!canSubmit" @click="startAnalysis">
-              <v-icon size="18">mdi-arrow-up</v-icon>
-            </v-btn>
+            <div class="search-actions">
+              <v-menu v-model="uploadMenuOpen" :close-on-content-click="false" location="bottom end" offset="10">
+                <template #activator="{ props }">
+                  <v-btn
+                    v-bind="props"
+                    icon
+                    size="small"
+                    variant="text"
+                    class="upload-trigger"
+                    aria-label="Open upload dialog"
+                  >
+                    <v-icon size="18">mdi-plus</v-icon>
+                  </v-btn>
+                </template>
+
+                <v-card class="upload-dialog" elevation="8">
+                  <div class="upload-dialog__title">Add files</div>
+                  <div class="upload-dialog__subtitle">Upload a company report to extract productive assets.</div>
+
+                  <v-text-field
+                    v-model="documentCompanyName"
+                    variant="outlined"
+                    density="comfortable"
+                    hide-details
+                    class="mt-3"
+                    label="Optional company name"
+                  />
+
+                  <div class="upload-dialog__meta mt-2">Accepted: PDF, DOCX, PPTX · Max {{ maxUploadLabel }}</div>
+
+                  <input
+                    ref="fileInputRef"
+                    type="file"
+                    accept=".pdf,.docx,.pptx"
+                    class="upload-dialog__input"
+                    @change="onFileInputChange"
+                  />
+
+                  <div class="upload-dialog__actions mt-4">
+                    <v-btn variant="outlined" color="primary" size="small" @click="openFilePicker">
+                      Choose file
+                    </v-btn>
+                    <span v-if="selectedFileName" class="upload-dialog__filename">{{ selectedFileName }}</span>
+                  </div>
+
+                  <div v-if="uploadError" class="upload-dialog__error mt-3">{{ uploadError }}</div>
+                </v-card>
+              </v-menu>
+
+              <v-btn icon size="small" color="primary" class="submit-icon" :disabled="!canSubmit" @click="startAnalysis">
+                <v-icon size="18">mdi-arrow-up</v-icon>
+              </v-btn>
+            </div>
           </template>
         </v-text-field>
       </v-form>
@@ -38,6 +88,7 @@
           {{ example }}
         </v-chip>
       </div>
+
     </div>
   </section>
 </template>
@@ -48,9 +99,17 @@ import { useAppStore } from '@/stores/store';
 
 const store = useAppStore();
 const searchText = ref('');
+const documentCompanyName = ref('');
+const selectedFileName = ref('');
+const uploadError = ref('');
+const uploadMenuOpen = ref(false);
+const fileInputRef = ref<HTMLInputElement | null>(null);
 const examples = ['Mercadona', 'Inditex', 'Repsol', 'Telefónica', 'Iberdrola', 'BBVA'];
+const MAX_UPLOAD_MB = 25;
+const ALLOWED_EXTENSIONS = new Set(['pdf', 'docx', 'pptx']);
 
 const canSubmit = computed(() => searchText.value.trim().length > 1);
+const maxUploadLabel = computed(() => `${MAX_UPLOAD_MB} MB`);
 
 const slugify = (value: string): string =>
   value
@@ -66,8 +125,55 @@ const startAnalysis = () => {
     id: slugify(name) || 'company',
     name,
   });
+  store.setAnalysisMode('search');
   store.resetAnalysis();
   store.setView('processing');
+};
+
+const openFilePicker = () => {
+  uploadError.value = '';
+  fileInputRef.value?.click();
+};
+
+const parseFileNameToCompany = (fileName: string): string => fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+
+const validateFile = (file: File): boolean => {
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    uploadError.value = 'Unsupported format. Please upload PDF, DOCX, or PPTX.';
+    return false;
+  }
+  if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+    uploadError.value = `File is too large. Max size is ${MAX_UPLOAD_MB} MB.`;
+    return false;
+  }
+  uploadError.value = '';
+  return true;
+};
+
+const startDocumentAnalysis = (file: File) => {
+  if (!validateFile(file)) return;
+
+  selectedFileName.value = file.name;
+  const companyName = documentCompanyName.value.trim() || parseFileNameToCompany(file.name) || 'Uploaded Document';
+
+  store.setCompany({
+    id: `doc_${slugify(companyName) || 'company'}`,
+    name: companyName,
+  });
+  store.setAnalysisMode('document');
+  store.resetAnalysis();
+  store.setUploadedFile(file);
+  uploadMenuOpen.value = false;
+  store.setView('processing');
+};
+
+const onFileInputChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+  startDocumentAnalysis(file);
+  target.value = '';
 };
 
 const quickSearch = (name: string) => {
@@ -165,6 +271,64 @@ const quickSearch = (name: string) => {
   border-radius: 12px;
   width: 34px;
   height: 34px;
+}
+
+.search-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.upload-trigger {
+  border-radius: 999px;
+  color: #4b5f8f;
+}
+
+.upload-dialog {
+  width: min(360px, 92vw);
+  border-radius: 16px;
+  border: 1px solid rgba(87, 110, 156, 0.2);
+  background: rgba(255, 255, 255, 0.98);
+  padding: 0.95rem;
+}
+
+.upload-dialog__title {
+  font-weight: 700;
+  color: #152a54;
+}
+
+.upload-dialog__subtitle {
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  color: #63759c;
+}
+
+.upload-dialog__meta {
+  font-size: 0.76rem;
+  color: #7b8caf;
+}
+
+.upload-dialog__input {
+  display: none;
+}
+
+.upload-dialog__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.upload-dialog__filename {
+  font-size: 0.8rem;
+  color: #173671;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-dialog__error {
+  font-size: 0.78rem;
+  color: #ba1d3f;
 }
 
 .quick-picks {

@@ -74,7 +74,7 @@
       <h2 class="processing-title">
         Analyzing <span class="company-highlight">{{ store.selectedCompany?.name || 'company' }}</span>
       </h2>
-      <p class="processing-subtitle">Scanning industrial assets across Spain</p>
+      <p class="processing-subtitle">{{ subtitleText }}</p>
 
       <!-- Progress percentage -->
       <div class="progress-ring-label">{{ Math.round(globalProgress) }}%</div>
@@ -150,23 +150,41 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores/store';
-import { startAnalysisSSE } from '@/services/backend';
+import { startAnalysisSSE, startDocumentAnalysisSSE } from '@/services/backend';
 import type { PipelineStep } from '@/types/types';
 
 const store = useAppStore();
 const errorMessage = ref('');
 let abortController: AbortController | null = null;
 
-const TOTAL_STEPS = 5;
+const SEARCH_STEPS: PipelineStep[] = [
+  { step: 0, name: 'Identificando empresa', status: 'pending' },
+  { step: 1, name: 'Buscando en Google Maps', status: 'pending' },
+  { step: 2, name: 'Clasificando activos con IA', status: 'pending' },
+  { step: 3, name: 'Enriqueciendo datos', status: 'pending' },
+  { step: 4, name: 'Calculando confianza', status: 'pending' },
+];
+
+const DOCUMENT_STEPS: PipelineStep[] = [
+  { step: 0, name: 'Parsing uploaded document', status: 'pending' },
+  { step: 1, name: 'Chunking structured content', status: 'pending' },
+  { step: 2, name: 'Extracting assets with AI', status: 'pending' },
+  { step: 3, name: 'Deduplicating asset mentions', status: 'pending' },
+  { step: 4, name: 'Geocoding and enrichment', status: 'pending' },
+  { step: 5, name: 'Scoring confidence', status: 'pending' },
+];
+
+const subtitleText = computed(() => {
+  if (store.analysisMode === 'document') {
+    return store.uploadedFileName
+      ? `Extracting productive assets from ${store.uploadedFileName}`
+      : 'Extracting productive assets from uploaded report';
+  }
+  return 'Scanning industrial assets across Spain';
+});
 
 const steps = computed(() => {
-  const defaults: PipelineStep[] = [
-    { step: 0, name: 'Identificando empresa', status: 'pending' },
-    { step: 1, name: 'Buscando en Google Maps', status: 'pending' },
-    { step: 2, name: 'Clasificando activos con IA', status: 'pending' },
-    { step: 3, name: 'Enriqueciendo datos', status: 'pending' },
-    { step: 4, name: 'Calculando confianza', status: 'pending' },
-  ];
+  const defaults = (store.analysisMode === 'document' ? DOCUMENT_STEPS : SEARCH_STEPS).map((step) => ({ ...step }));
   for (const s of store.pipelineSteps) {
     const idx = defaults.findIndex((d) => d.step === s.step);
     if (idx >= 0) defaults[idx] = { ...defaults[idx], ...s };
@@ -174,10 +192,12 @@ const steps = computed(() => {
   return defaults;
 });
 
+const totalSteps = computed(() => steps.value.length || 1);
+
 const globalProgress = computed(() => {
   const completed = steps.value.filter((s) => s.status === 'complete').length;
   const running = steps.value.filter((s) => s.status === 'running').length;
-  return ((completed + running * 0.5) / TOTAL_STEPS) * 100;
+  return ((completed + running * 0.5) / totalSteps.value) * 100;
 });
 
 const startAnalysis = () => {
@@ -185,38 +205,54 @@ const startAnalysis = () => {
   errorMessage.value = '';
   store.pipelineSteps = [];
 
+  const onEvent = (event: string, data: any) => {
+    if (event === 'step_start') {
+      store.updateStep({
+        step: data.step,
+        name: data.name,
+        status: 'running',
+        estimated_seconds: data.estimated_seconds,
+      });
+    } else if (event === 'step_complete') {
+      store.updateStep({ step: data.step, name: data.name, status: 'complete', found: data.found });
+    } else if (event === 'complete') {
+      const assets = data.assets || [];
+      const metadata = data.metadata || { total_assets: assets.length };
+      store.setAssets(assets, metadata);
+      store.setView('results');
+    } else if (event === 'error') {
+      errorMessage.value = data.message || 'Error en el pipeline';
+    }
+  };
+
+  const onError = (error: any) => {
+    errorMessage.value = error?.message || 'Error de conexión';
+  };
+
+  if (store.analysisMode === 'document' && store.uploadedFile) {
+    abortController = startDocumentAnalysisSSE(
+      store.uploadedFile,
+      store.selectedCompany.name,
+      true,
+      onEvent,
+      onError,
+    );
+    return;
+  }
+
   abortController = startAnalysisSSE(
     store.selectedCompany.id,
     store.selectedCompany.name,
     true,
-    (event: string, data: any) => {
-      if (event === 'step_start') {
-        store.updateStep({
-          step: data.step,
-          name: data.name,
-          status: 'running',
-          estimated_seconds: data.estimated_seconds,
-        });
-      } else if (event === 'step_complete') {
-        store.updateStep({ step: data.step, name: data.name, status: 'complete', found: data.found });
-      } else if (event === 'complete') {
-        const assets = data.assets || [];
-        const metadata = data.metadata || { total_assets: assets.length };
-        store.setAssets(assets, metadata);
-        store.setView('results');
-      } else if (event === 'error') {
-        errorMessage.value = data.message || 'Error en el pipeline';
-      }
-    },
-    (error: any) => {
-      errorMessage.value = error?.message || 'Error de conexión';
-    },
+    onEvent,
+    onError,
   );
 };
 
 const cancel = () => {
   abortController?.abort();
   store.resetAnalysis();
+  store.setAnalysisMode('search');
   store.setView('search');
 };
 

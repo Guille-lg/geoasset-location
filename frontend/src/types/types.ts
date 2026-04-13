@@ -117,4 +117,6 @@ export interface AnalysisMetadata {
   last_updated?: string
 }
 
+export type AnalysisMode = 'search' | 'document'
+
 export type AppView = 'search' | 'processing' | 'results'

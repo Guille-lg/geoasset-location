@@ -29,6 +29,12 @@ class Settings:
 
     CONFIDENCE_THRESHOLD_HIGH: float = float(os.environ.get("CONFIDENCE_THRESHOLD_HIGH", "0.65"))
     CONFIDENCE_THRESHOLD_MEDIUM: float = float(os.environ.get("CONFIDENCE_THRESHOLD_MEDIUM", "0.35"))
+    UPLOAD_MAX_SIZE_MB: int = int(os.environ.get("UPLOAD_MAX_SIZE_MB", "25"))
+    OMP_NUM_THREADS: int = int(os.environ.get("OMP_NUM_THREADS", "4"))
+    DOCLING_NUM_THREADS: int = int(os.environ.get("DOCLING_NUM_THREADS", "4"))
+    DOCLING_PDF_OCR: bool = os.environ.get("DOCLING_PDF_OCR", "false").lower() in {"1", "true", "yes"}
+    DOC_EXTRACTION_MAX_CONCURRENCY: int = int(os.environ.get("DOC_EXTRACTION_MAX_CONCURRENCY", "8"))
+    DOC_GEOCODE_MAX_CONCURRENCY: int = int(os.environ.get("DOC_GEOCODE_MAX_CONCURRENCY", "8"))
 
     @property
     def database_url(self) -> str:

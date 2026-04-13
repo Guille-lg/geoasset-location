@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import type { Asset, Company, PipelineStep, AnalysisMetadata, AppView } from '@/types/types';
+import type { Asset, Company, PipelineStep, AnalysisMetadata, AppView, AnalysisMode } from '@/types/types';
 
 export interface AppState {
   currentView: AppView;
@@ -13,6 +13,9 @@ export interface AppState {
   filterMinConfidence: number;
   clusteringEnabled: boolean;
   selectedAssetId: string | null;
+  analysisMode: AnalysisMode;
+  uploadedFile: File | null;
+  uploadedFileName: string;
 }
 
 export const useAppStore = defineStore('app', {
@@ -28,6 +31,9 @@ export const useAppStore = defineStore('app', {
     filterMinConfidence: 0,
     clusteringEnabled: true,
     selectedAssetId: null,
+    analysisMode: 'search',
+    uploadedFile: null,
+    uploadedFileName: '',
   }),
   getters: {
     filteredAssets(state): Asset[] {
@@ -59,6 +65,13 @@ export const useAppStore = defineStore('app', {
     setCompany(company: Company) {
       this.selectedCompany = company;
     },
+    setAnalysisMode(mode: AnalysisMode) {
+      this.analysisMode = mode;
+    },
+    setUploadedFile(file: File | null) {
+      this.uploadedFile = file;
+      this.uploadedFileName = file?.name || '';
+    },
     setAssets(assets: Asset[], metadata: AnalysisMetadata) {
       this.assets = assets;
       this.metadata = metadata;
@@ -70,6 +83,8 @@ export const useAppStore = defineStore('app', {
       this.selectedAssetId = null;
       this.filterCategory = null;
       this.filterMinConfidence = 0;
+      this.uploadedFile = null;
+      this.uploadedFileName = '';
     },
     updateStep(step: PipelineStep) {
       const idx = this.pipelineSteps.findIndex((s) => s.step === step.step);

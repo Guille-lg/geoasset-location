@@ -67,7 +67,7 @@ class RawPlace(BaseModel):
     address: str
     latitude: float
     longitude: float
-    types: List[str] = []
+    types: List[str] = Field(default_factory=list)
     website: Optional[str] = None
     phone: Optional[str] = None
     rating: Optional[float] = None
@@ -85,7 +85,7 @@ class FilteredAsset(BaseModel):
     address: str
     latitude: float
     longitude: float
-    types: List[str] = []
+    types: List[str] = Field(default_factory=list)
     website: Optional[str] = None
     phone: Optional[str] = None
     rating: Optional[float] = None
@@ -96,7 +96,7 @@ class FilteredAsset(BaseModel):
 class EnrichedAsset(FilteredAsset):
     description: Optional[str] = None
     size_estimate: Optional[str] = None
-    functional_tags: List[str] = []
+    functional_tags: List[str] = Field(default_factory=list)
     municipality: str = ""
     province: str = ""
     autonomous_community: str = ""
@@ -125,12 +125,12 @@ class Asset(BaseModel):
     postal_code: Optional[str] = None
     description: Optional[str] = None
     size_estimate: Optional[str] = None
-    functional_tags: List[str] = []
+    functional_tags: List[str] = Field(default_factory=list)
     is_headquarters: bool = False
     google_place_id: str
     confidence_score: float = 0.0
     confidence_tier: str = "LOW"
-    data_sources: List[str] = []
+    data_sources: List[str] = Field(default_factory=list)
     website: Optional[str] = None
     phone: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -141,6 +141,53 @@ class AnalyzeRequest(BaseModel):
     company_id: str
     company_name: str
     force_refresh: bool = False
+
+
+class DocumentAnalyzeRequest(BaseModel):
+    company_name: Optional[str] = None
+    force_refresh: bool = False
+
+
+class DocumentExtractedAsset(BaseModel):
+    asset_name: str
+    category: AssetCategory = AssetCategory.OTR
+    location_hints: List[str] = Field(default_factory=list)
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    evidence_quote: Optional[str] = None
+    llm_confidence: float = 0.5
+    source_chunk: Optional[int] = None
+
+
+class DocumentEnrichedAsset(DocumentExtractedAsset):
+    place_id: str
+    raw_name: str
+    name: str
+    latitude: float
+    longitude: float
+    address: str
+    types: List[str] = Field(default_factory=list)
+    website: Optional[str] = None
+    phone: Optional[str] = None
+    rating: Optional[float] = None
+    user_ratings_total: Optional[int] = None
+    is_headquarters: bool = False
+    description: Optional[str] = None
+    size_estimate: Optional[str] = None
+    functional_tags: List[str] = Field(default_factory=list)
+    municipality: str = ""
+    province: str = ""
+    autonomous_community: str = ""
+    postal_code: Optional[str] = None
+    coordinate_source: str = "unknown"
+    evidence_count: int = 1
+
+
+class DocumentScoredAsset(DocumentEnrichedAsset):
+    confidence_score: float = 0.0
+    confidence_tier: str = "LOW"
+    data_sources: List[str] = Field(default_factory=lambda: ["document_upload", "llm_inference"])
 
 
 class PipelineEvent(BaseModel):

@@ -1,0 +1,28 @@
+system: |
+  You infer geocoordinates from textual location evidence.
+  Respond ONLY with valid JSON.
+
+  Rules:
+  - Infer latitude/longitude only when confidence is reasonable.
+  - Prefer explicit address over vague hints.
+  - Return null coordinates when uncertain.
+
+  JSON schema:
+  {
+    "latitude": number|null,
+    "longitude": number|null,
+    "address": "string|null",
+    "municipality": "string",
+    "province": "string",
+    "autonomous_community": "string",
+    "postal_code": "string|null",
+    "confidence": number
+  }
+
+user: |
+  Company: {company_name}
+  Asset: {asset_name}
+  Category: {category}
+  Address: {address}
+  Location hints: {location_hints}
+  Evidence quote: {evidence_quote}
