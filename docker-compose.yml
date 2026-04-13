@@ -1,0 +1,86 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geoassets}
+      POSTGRES_USER: ${POSTGRES_USER:-geoassets}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geoassets}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    expose:
+      - 5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-geoassets}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    expose:
+      - 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    restart: always
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    hostname: geoassets-backend
+    command: "sh entrypoint.sh"
+    environment:
+      - BACKEND_DEBUG=false
+      - BACKEND_PORT=8000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-geoassets}
+      - POSTGRES_USER=${POSTGRES_USER:-geoassets}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-geoassets}
+      - REDIS_HOST=redis
+      - REDIS_TTL_SECONDS=${REDIS_TTL_SECONDS:-86400}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - LITELLM_MODEL=${LITELLM_MODEL:-bedrock/openai.gpt-oss-120b-1:0}
+      - LITELLM_FALLBACK_MODEL=${LITELLM_FALLBACK_MODEL:-}
+      - LITELLM_MAX_WORKERS=${LITELLM_MAX_WORKERS:-5}
+      - LITELLM_TIMEOUT=${LITELLM_TIMEOUT:-30}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION_NAME=${AWS_REGION_NAME:-eu-west-1}
+      - AWS_DEFAULT_REGION=${AWS_REGION_NAME:-eu-west-1}
+      - AWS_REGION=${AWS_REGION_NAME:-eu-west-1}
+      - CONFIDENCE_THRESHOLD_HIGH=${CONFIDENCE_THRESHOLD_HIGH:-0.65}
+      - CONFIDENCE_THRESHOLD_MEDIUM=${CONFIDENCE_THRESHOLD_MEDIUM:-0.35}
+    expose:
+      - 8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    restart: always
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - 'VITE_APP_BACKEND_HOST='
+        - 'VITE_APP_BACKEND_PORT='
+    hostname: geoassets-ui
+    environment:
+      - 'UI_PORT=3000'
+    ports:
+      - 3000:3000
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

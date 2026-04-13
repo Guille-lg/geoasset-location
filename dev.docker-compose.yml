@@ -1,0 +1,49 @@
+services:
+
+  postgres:
+    extends:
+      file: docker-compose.yml
+      service: postgres
+    ports:
+      - 5432:5432
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+    ports:
+      - 6379:6379
+
+  backend:
+    image: geoassets-backend-dev
+    extends:
+      file: docker-compose.yml
+      service: backend
+    build:
+      context: ./backend
+      dockerfile: dev.Dockerfile
+    volumes:
+      - './backend:/app'
+    environment:
+      - BACKEND_DEBUG=true
+    ports:
+      - 8000:8000
+
+  frontend:
+    image: geoassets-ui-dev
+    extends:
+      file: docker-compose.yml
+      service: frontend
+    build:
+      context: ./frontend
+      dockerfile: dev.Dockerfile
+    volumes:
+      - './frontend:/app'
+    environment:
+      - 'VITE_APP_BACKEND_HOST='
+      - 'VITE_APP_BACKEND_PORT=8000'
+    ports:
+      - 3000:3000
+
+volumes:
+  pgdata:

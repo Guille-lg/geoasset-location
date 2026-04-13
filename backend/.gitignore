@@ -1,0 +1,4 @@
+data/*
+!**/README.md
+scratchpad.py
+vscode/*

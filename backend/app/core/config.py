@@ -1,0 +1,42 @@
+import os
+
+
+class Settings:
+    POSTGRES_HOST: str = os.environ.get("POSTGRES_HOST", "localhost")
+    POSTGRES_DB: str = os.environ.get("POSTGRES_DB", "geoassets")
+    POSTGRES_USER: str = os.environ.get("POSTGRES_USER", "geoassets")
+    POSTGRES_PASSWORD: str = os.environ.get("POSTGRES_PASSWORD", "geoassets")
+    POSTGRES_PORT: int = int(os.environ.get("POSTGRES_PORT", "5432"))
+
+    REDIS_HOST: str = os.environ.get("REDIS_HOST", "localhost")
+    REDIS_PORT: int = int(os.environ.get("REDIS_PORT", "6379"))
+    REDIS_TTL_SECONDS: int = int(os.environ.get("REDIS_TTL_SECONDS", "86400"))
+
+    GOOGLE_MAPS_API_KEY: str = os.environ.get("GOOGLE_MAPS_API_KEY", "")
+    MAPS_MAX_QUERY_BUDGET: int = int(os.environ.get("MAPS_MAX_QUERY_BUDGET", "300"))
+    MAPS_MAX_RESULTS_PER_QUERY: int = int(os.environ.get("MAPS_MAX_RESULTS_PER_QUERY", "20"))
+    MAPS_KEYWORDS_PER_CATEGORY: int = int(os.environ.get("MAPS_KEYWORDS_PER_CATEGORY", "8"))
+    MAPS_MAX_CONCURRENT_REQUESTS: int = int(os.environ.get("MAPS_MAX_CONCURRENT_REQUESTS", "10"))
+
+    LITELLM_MODEL: str = os.environ.get("LITELLM_MODEL", "bedrock/openai.gpt-oss-120b-1:0")
+    LITELLM_FALLBACK_MODEL: str = os.environ.get("LITELLM_FALLBACK_MODEL", "")
+    LITELLM_MAX_WORKERS: int = int(os.environ.get("LITELLM_MAX_WORKERS", "5"))
+    LITELLM_TIMEOUT: int = int(os.environ.get("LITELLM_TIMEOUT", "30"))
+
+    OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "")
+    ANTHROPIC_API_KEY: str = os.environ.get("ANTHROPIC_API_KEY", "")
+    AWS_REGION_NAME: str = os.environ.get("AWS_REGION_NAME", "eu-west-1")
+
+    CONFIDENCE_THRESHOLD_HIGH: float = float(os.environ.get("CONFIDENCE_THRESHOLD_HIGH", "0.65"))
+    CONFIDENCE_THRESHOLD_MEDIUM: float = float(os.environ.get("CONFIDENCE_THRESHOLD_MEDIUM", "0.35"))
+
+    @property
+    def database_url(self) -> str:
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    @property
+    def database_url_sync(self) -> str:
+        return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+
+settings = Settings()
