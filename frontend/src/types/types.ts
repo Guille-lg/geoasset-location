@@ -117,6 +117,8 @@ export interface AnalysisMetadata {
   last_updated?: string
 }
 
-export type AnalysisMode = 'search' | 'document'
+export type AssetSource = 'maps_api' | 'document_upload'
+
+export type AnalysisMode = 'search' | 'document' | 'combined'
 
 export type AppView = 'search' | 'processing' | 'results'

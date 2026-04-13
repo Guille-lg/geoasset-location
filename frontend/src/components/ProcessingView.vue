@@ -79,25 +79,41 @@
       <!-- Progress percentage -->
       <div class="progress-ring-label">{{ Math.round(globalProgress) }}%</div>
 
-      <!-- Timeline steps -->
-      <div class="timeline">
+      <!-- Timeline steps — combined mode shows two labeled groups -->
+      <template v-if="isCombined">
+        <div class="pipeline-group">
+          <div class="pipeline-group__label"><v-icon size="14" class="mr-1">mdi-google-maps</v-icon>Maps API</div>
+          <div class="timeline">
+            <div v-for="(step, i) in searchSteps" :key="step.step" class="timeline-step" :class="stepClass(step)">
+              <div v-if="i > 0" class="timeline-connector"><div class="timeline-connector-fill" :class="{ filled: step.status !== 'pending' }" /></div>
+              <div class="timeline-node"><template v-if="step.status === 'running'"><svg class="node-spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="rgba(44,111,255,0.2)" stroke-width="2" /><circle cx="12" cy="12" r="10" fill="none" stroke="#2c6fff" stroke-width="2" stroke-dasharray="20 43" stroke-linecap="round" class="spinner-arc" /></svg></template><template v-else-if="step.status === 'complete'"><svg class="node-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#14b86a" /><path d="M8 12.5l2.5 2.5 5.5-5.5" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="check-path" /></svg></template><template v-else-if="step.status === 'error'"><svg class="node-error" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#ef4444" /><path d="M9 9l6 6M15 9l-6 6" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" /></svg></template><div v-else class="node-pending"><span>{{ i + 1 }}</span></div></div>
+              <div class="timeline-label"><span class="timeline-name">{{ step.name }}</span><span v-if="step.found != null && step.status === 'complete'" class="timeline-meta">{{ step.found }} results</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="pipeline-group">
+          <div class="pipeline-group__label"><v-icon size="14" class="mr-1">mdi-file-document-outline</v-icon>Document</div>
+          <div class="timeline">
+            <div v-for="(step, i) in documentSteps" :key="step.step" class="timeline-step" :class="stepClass(step)">
+              <div v-if="i > 0" class="timeline-connector"><div class="timeline-connector-fill" :class="{ filled: step.status !== 'pending' }" /></div>
+              <div class="timeline-node"><template v-if="step.status === 'running'"><svg class="node-spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="rgba(44,111,255,0.2)" stroke-width="2" /><circle cx="12" cy="12" r="10" fill="none" stroke="#10b7c8" stroke-width="2" stroke-dasharray="20 43" stroke-linecap="round" class="spinner-arc" /></svg></template><template v-else-if="step.status === 'complete'"><svg class="node-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#14b86a" /><path d="M8 12.5l2.5 2.5 5.5-5.5" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="check-path" /></svg></template><template v-else-if="step.status === 'error'"><svg class="node-error" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#ef4444" /><path d="M9 9l6 6M15 9l-6 6" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" /></svg></template><div v-else class="node-pending"><span>{{ i + 1 }}</span></div></div>
+              <div class="timeline-label"><span class="timeline-name">{{ step.name }}</span><span v-if="step.found != null && step.status === 'complete'" class="timeline-meta">{{ step.found }} results</span></div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Single pipeline mode -->
+      <div v-else class="timeline">
         <div
           v-for="(step, i) in steps"
           :key="step.step"
           class="timeline-step"
-          :class="{
-            'timeline-step--complete': step.status === 'complete',
-            'timeline-step--running': step.status === 'running',
-            'timeline-step--error': step.status === 'error',
-            'timeline-step--pending': step.status === 'pending',
-          }"
+          :class="stepClass(step)"
         >
-          <!-- Connector line -->
           <div v-if="i > 0" class="timeline-connector">
             <div class="timeline-connector-fill" :class="{ filled: step.status !== 'pending' }" />
           </div>
-
-          <!-- Node -->
           <div class="timeline-node">
             <svg v-if="step.status === 'running'" class="node-spinner" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10" fill="none" stroke="rgba(44,111,255,0.2)" stroke-width="2" />
@@ -121,8 +137,6 @@
               <span>{{ i + 1 }}</span>
             </div>
           </div>
-
-          <!-- Label -->
           <div class="timeline-label">
             <span class="timeline-name">{{ step.name }}</span>
             <span v-if="step.found != null && step.status === 'complete'" class="timeline-meta">
@@ -155,7 +169,9 @@ import type { PipelineStep } from '@/types/types';
 
 const store = useAppStore();
 const errorMessage = ref('');
-let abortController: AbortController | null = null;
+const abortControllers: AbortController[] = [];
+
+const DOC_STEP_OFFSET = 100;
 
 const SEARCH_STEPS: PipelineStep[] = [
   { step: 0, name: 'Identificando empresa', status: 'pending' },
@@ -174,22 +190,57 @@ const DOCUMENT_STEPS: PipelineStep[] = [
   { step: 5, name: 'Scoring confidence', status: 'pending' },
 ];
 
+const searchComplete = ref(false);
+const docComplete = ref(false);
+
+const isCombined = computed(() => store.analysisMode === 'combined');
+const hasSearch = computed(() => store.analysisMode === 'search' || store.analysisMode === 'combined');
+const hasDoc = computed(() => store.analysisMode === 'document' || store.analysisMode === 'combined');
+
 const subtitleText = computed(() => {
+  if (store.analysisMode === 'combined') {
+    return 'Running Maps API lookup and document extraction in parallel';
+  }
   if (store.analysisMode === 'document') {
-    return store.uploadedFileName
-      ? `Extracting productive assets from ${store.uploadedFileName}`
+    const fName = store.uploadedFiles[0]?.name;
+    return fName
+      ? `Extracting productive assets from ${fName}`
       : 'Extracting productive assets from uploaded report';
   }
   return 'Scanning industrial assets across Spain';
 });
 
-const steps = computed(() => {
-  const defaults = (store.analysisMode === 'document' ? DOCUMENT_STEPS : SEARCH_STEPS).map((step) => ({ ...step }));
+const searchSteps = computed(() => {
+  const defaults = SEARCH_STEPS.map((s) => ({ ...s }));
   for (const s of store.pipelineSteps) {
+    if (s.step >= DOC_STEP_OFFSET) continue;
     const idx = defaults.findIndex((d) => d.step === s.step);
     if (idx >= 0) defaults[idx] = { ...defaults[idx], ...s };
   }
   return defaults;
+});
+
+const documentSteps = computed(() => {
+  const defaults = DOCUMENT_STEPS.map((s) => ({ ...s, step: s.step + DOC_STEP_OFFSET }));
+  for (const s of store.pipelineSteps) {
+    if (s.step < DOC_STEP_OFFSET) continue;
+    const idx = defaults.findIndex((d) => d.step === s.step);
+    if (idx >= 0) defaults[idx] = { ...defaults[idx], ...s };
+  }
+  return defaults;
+});
+
+const steps = computed(() => {
+  if (store.analysisMode === 'combined') return [...searchSteps.value, ...documentSteps.value];
+  if (store.analysisMode === 'document') return documentSteps.value;
+  return searchSteps.value;
+});
+
+const stepClass = (step: PipelineStep) => ({
+  'timeline-step--complete': step.status === 'complete',
+  'timeline-step--running': step.status === 'running',
+  'timeline-step--error': step.status === 'error',
+  'timeline-step--pending': step.status === 'pending',
 });
 
 const totalSteps = computed(() => steps.value.length || 1);
@@ -200,64 +251,105 @@ const globalProgress = computed(() => {
   return ((completed + running * 0.5) / totalSteps.value) * 100;
 });
 
+const tryFinish = () => {
+  const needSearch = hasSearch.value;
+  const needDoc = hasDoc.value;
+  if (needSearch && !searchComplete.value) return;
+  if (needDoc && !docComplete.value) return;
+  store.setView('results');
+};
+
+const makeSearchEventHandler = () => (event: string, data: any) => {
+  if (event === 'step_start') {
+    store.updateStep({ step: data.step, name: data.name, status: 'running', estimated_seconds: data.estimated_seconds });
+  } else if (event === 'step_complete') {
+    store.updateStep({ step: data.step, name: data.name, status: 'complete', found: data.found });
+  } else if (event === 'complete') {
+    const assets = data.assets || [];
+    const metadata = data.metadata || { total_assets: assets.length };
+    if (isCombined.value) {
+      store.appendAssets(assets, metadata);
+    } else {
+      store.setAssets(assets, metadata);
+    }
+    searchComplete.value = true;
+    tryFinish();
+  } else if (event === 'error') {
+    errorMessage.value = data.message || 'Error in search pipeline';
+  }
+};
+
+const makeDocEventHandler = () => (event: string, data: any) => {
+  if (event === 'step_start') {
+    store.updateStep({ step: data.step + DOC_STEP_OFFSET, name: data.name, status: 'running', estimated_seconds: data.estimated_seconds });
+  } else if (event === 'step_complete') {
+    store.updateStep({ step: data.step + DOC_STEP_OFFSET, name: data.name, status: 'complete', found: data.found });
+  } else if (event === 'complete') {
+    const assets = data.assets || [];
+    const metadata = data.metadata || { total_assets: assets.length };
+    if (isCombined.value) {
+      store.appendAssets(assets, metadata);
+    } else {
+      store.setAssets(assets, metadata);
+    }
+    docComplete.value = true;
+    tryFinish();
+  } else if (event === 'error') {
+    errorMessage.value = data.message || 'Error in document pipeline';
+  }
+};
+
+const onError = (error: any) => {
+  errorMessage.value = error?.message || 'Error de conexión';
+};
+
 const startAnalysis = () => {
   if (!store.selectedCompany) return;
   errorMessage.value = '';
   store.pipelineSteps = [];
+  searchComplete.value = false;
+  docComplete.value = false;
 
-  const onEvent = (event: string, data: any) => {
-    if (event === 'step_start') {
-      store.updateStep({
-        step: data.step,
-        name: data.name,
-        status: 'running',
-        estimated_seconds: data.estimated_seconds,
-      });
-    } else if (event === 'step_complete') {
-      store.updateStep({ step: data.step, name: data.name, status: 'complete', found: data.found });
-    } else if (event === 'complete') {
-      const assets = data.assets || [];
-      const metadata = data.metadata || { total_assets: assets.length };
-      store.setAssets(assets, metadata);
-      store.setView('results');
-    } else if (event === 'error') {
-      errorMessage.value = data.message || 'Error en el pipeline';
-    }
-  };
-
-  const onError = (error: any) => {
-    errorMessage.value = error?.message || 'Error de conexión';
-  };
-
-  if (store.analysisMode === 'document' && store.uploadedFile) {
-    abortController = startDocumentAnalysisSSE(
-      store.uploadedFile,
+  if (hasSearch.value) {
+    const ctrl = startAnalysisSSE(
+      store.selectedCompany.id,
       store.selectedCompany.name,
       true,
-      onEvent,
+      makeSearchEventHandler(),
       onError,
     );
-    return;
+    abortControllers.push(ctrl);
+  } else {
+    searchComplete.value = true;
   }
 
-  abortController = startAnalysisSSE(
-    store.selectedCompany.id,
-    store.selectedCompany.name,
-    true,
-    onEvent,
-    onError,
-  );
+  if (hasDoc.value && store.uploadedFiles.length > 0) {
+    for (const file of store.uploadedFiles) {
+      const ctrl = startDocumentAnalysisSSE(
+        file,
+        store.selectedCompany.name,
+        true,
+        makeDocEventHandler(),
+        onError,
+      );
+      abortControllers.push(ctrl);
+    }
+  } else {
+    docComplete.value = true;
+  }
 };
 
 const cancel = () => {
-  abortController?.abort();
+  for (const ctrl of abortControllers) ctrl.abort();
+  abortControllers.length = 0;
   store.resetAnalysis();
   store.setAnalysisMode('search');
   store.setView('search');
 };
 
 const retry = () => {
-  abortController?.abort();
+  for (const ctrl of abortControllers) ctrl.abort();
+  abortControllers.length = 0;
   startAnalysis();
 };
 
@@ -266,7 +358,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  abortController?.abort();
+  for (const ctrl of abortControllers) ctrl.abort();
 });
 </script>
 
@@ -395,6 +487,24 @@ onUnmounted(() => {
 @keyframes riseIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Pipeline groups (combined mode) ── */
+.pipeline-group {
+  width: 100%;
+  max-width: 560px;
+  margin-bottom: 1.25rem;
+}
+
+.pipeline-group__label {
+  display: flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4b5f8f;
+  margin-bottom: 0.5rem;
 }
 
 /* ── Timeline ── */

@@ -141,8 +141,10 @@ async def geocode_and_enrich_document_assets(
                 if asset.evidence_quote:
                     evidence_count = max(1, asset.evidence_quote.count("\n---\n") + 1)
 
+                base_data = asset.model_dump(exclude={"latitude", "longitude", "address"})
+
                 return DocumentEnrichedAsset(
-                    **asset.model_dump(),
+                    **base_data,
                     place_id=f"doc_{_slug(company_name)}_{idx}_{uuid.uuid4().hex[:8]}",
                     raw_name=asset.asset_name,
                     name=asset.asset_name,

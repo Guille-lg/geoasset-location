@@ -55,6 +55,36 @@
           color="primary"
         />
       </div>
+      <div v-if="Object.keys(store.sourceCounts).length > 1" class="d-flex flex-wrap ga-1 mt-2">
+        <v-chip
+          size="x-small"
+          :variant="store.filterSource === null ? 'flat' : 'outlined'"
+          color="primary"
+          @click="store.filterSource = null"
+        >
+          All
+        </v-chip>
+        <v-chip
+          v-if="store.sourceCounts['maps_api']"
+          size="x-small"
+          :variant="store.filterSource === 'maps_api' ? 'flat' : 'outlined'"
+          color="blue"
+          @click="store.filterSource = store.filterSource === 'maps_api' ? null : 'maps_api'"
+        >
+          <v-icon start size="12">mdi-google-maps</v-icon>
+          Maps API ({{ store.sourceCounts['maps_api'] }})
+        </v-chip>
+        <v-chip
+          v-if="store.sourceCounts['document_upload']"
+          size="x-small"
+          :variant="store.filterSource === 'document_upload' ? 'flat' : 'outlined'"
+          color="teal"
+          @click="store.filterSource = store.filterSource === 'document_upload' ? null : 'document_upload'"
+        >
+          <v-icon start size="12">mdi-file-document-outline</v-icon>
+          Document ({{ store.sourceCounts['document_upload'] }})
+        </v-chip>
+      </div>
     </div>
 
     <!-- Asset list -->
@@ -75,9 +105,21 @@
           {{ asset.municipality || asset.address?.split(',')[0] }}
         </v-list-item-subtitle>
         <template #append>
-          <v-chip :color="getTierColor(asset.confidence_tier)" size="x-small" variant="tonal">
-            {{ (asset.confidence_score * 100).toFixed(0) }}%
-          </v-chip>
+          <div class="d-flex align-center ga-1">
+            <v-chip
+              v-for="src in (asset.data_sources || [])"
+              :key="src"
+              size="x-small"
+              :color="src === 'maps_api' ? 'blue' : src === 'document_upload' ? 'teal' : 'grey'"
+              variant="tonal"
+              class="source-chip"
+            >
+              <v-icon size="10">{{ src === 'maps_api' ? 'mdi-google-maps' : 'mdi-file-document-outline' }}</v-icon>
+            </v-chip>
+            <v-chip :color="getTierColor(asset.confidence_tier)" size="x-small" variant="tonal">
+              {{ (asset.confidence_score * 100).toFixed(0) }}%
+            </v-chip>
+          </div>
         </template>
       </v-list-item>
 
@@ -227,6 +269,11 @@ const backToSearch = () => {
 
 .empty-list {
   color: #788db1;
+}
+
+.source-chip {
+  min-width: 0;
+  padding: 0 4px !important;
 }
 
 .sidebar-footer {

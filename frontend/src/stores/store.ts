@@ -14,8 +14,8 @@ export interface AppState {
   clusteringEnabled: boolean;
   selectedAssetId: string | null;
   analysisMode: AnalysisMode;
-  uploadedFile: File | null;
-  uploadedFileName: string;
+  uploadedFiles: File[];
+  filterSource: string | null;
 }
 
 export const useAppStore = defineStore('app', {
@@ -32,8 +32,8 @@ export const useAppStore = defineStore('app', {
     clusteringEnabled: true,
     selectedAssetId: null,
     analysisMode: 'search',
-    uploadedFile: null,
-    uploadedFileName: '',
+    uploadedFiles: [],
+    filterSource: null,
   }),
   getters: {
     filteredAssets(state): Asset[] {
@@ -44,7 +44,19 @@ export const useAppStore = defineStore('app', {
       if (state.filterMinConfidence > 0) {
         result = result.filter((a) => a.confidence_score >= state.filterMinConfidence);
       }
+      if (state.filterSource) {
+        result = result.filter((a) => a.data_sources?.includes(state.filterSource!));
+      }
       return result;
+    },
+    sourceCounts(state): Record<string, number> {
+      const counts: Record<string, number> = {};
+      for (const a of state.assets) {
+        for (const src of (a.data_sources || [])) {
+          counts[src] = (counts[src] || 0) + 1;
+        }
+      }
+      return counts;
     },
     categoryCounts(state): Record<string, number> {
       const counts: Record<string, number> = {};
@@ -68,13 +80,28 @@ export const useAppStore = defineStore('app', {
     setAnalysisMode(mode: AnalysisMode) {
       this.analysisMode = mode;
     },
-    setUploadedFile(file: File | null) {
-      this.uploadedFile = file;
-      this.uploadedFileName = file?.name || '';
+    addUploadedFile(file: File) {
+      this.uploadedFiles.push(file);
+    },
+    removeUploadedFile(index: number) {
+      this.uploadedFiles.splice(index, 1);
     },
     setAssets(assets: Asset[], metadata: AnalysisMetadata) {
       this.assets = assets;
       this.metadata = metadata;
+    },
+    appendAssets(newAssets: Asset[], newMetadata: AnalysisMetadata) {
+      const existingIds = new Set(this.assets.map((a) => a.id));
+      const unique = newAssets.filter((a) => !existingIds.has(a.id));
+      this.assets = [...this.assets, ...unique];
+      this.metadata = {
+        ...(this.metadata || {}),
+        total_assets: this.assets.length,
+        high_confidence: this.assets.filter((a) => a.confidence_tier === 'HIGH').length,
+        medium_confidence: this.assets.filter((a) => a.confidence_tier === 'MEDIUM').length,
+        low_confidence: this.assets.filter((a) => a.confidence_tier === 'LOW').length,
+        company: newMetadata.company || this.metadata?.company,
+      };
     },
     resetAnalysis() {
       this.assets = [];
@@ -83,8 +110,8 @@ export const useAppStore = defineStore('app', {
       this.selectedAssetId = null;
       this.filterCategory = null;
       this.filterMinConfidence = 0;
-      this.uploadedFile = null;
-      this.uploadedFileName = '';
+      this.filterSource = null;
+      this.uploadedFiles = [];
     },
     updateStep(step: PipelineStep) {
       const idx = this.pipelineSteps.findIndex((s) => s.step === step.step);

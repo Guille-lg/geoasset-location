@@ -13,7 +13,7 @@ class Settings:
     REDIS_TTL_SECONDS: int = int(os.environ.get("REDIS_TTL_SECONDS", "86400"))
 
     GOOGLE_MAPS_API_KEY: str = os.environ.get("GOOGLE_MAPS_API_KEY", "")
-    MAPS_MAX_QUERY_BUDGET: int = int(os.environ.get("MAPS_MAX_QUERY_BUDGET", "300"))
+    MAPS_MAX_QUERY_BUDGET: int = int(os.environ.get("MAPS_MAX_QUERY_BUDGET", "50"))
     MAPS_MAX_RESULTS_PER_QUERY: int = int(os.environ.get("MAPS_MAX_RESULTS_PER_QUERY", "20"))
     MAPS_KEYWORDS_PER_CATEGORY: int = int(os.environ.get("MAPS_KEYWORDS_PER_CATEGORY", "8"))
     MAPS_MAX_CONCURRENT_REQUESTS: int = int(os.environ.get("MAPS_MAX_CONCURRENT_REQUESTS", "10"))

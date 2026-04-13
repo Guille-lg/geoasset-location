@@ -75,14 +75,23 @@ function buildPopupContent(asset: Asset): string {
     ? '<span style="display:inline-block;padding:2px 8px;margin-left:6px;background:#fef4cc;color:#8c6a00;border-radius:999px;font-size:10px;font-weight:600;">HQ</span>'
     : '';
 
+  const sourceChips = (asset.data_sources || [])
+    .map((src: string) => {
+      if (src === 'maps_api') return '<span style="display:inline-block;padding:2px 8px;margin:2px;background:rgba(44,111,255,0.12);color:#2c6fff;border-radius:999px;font-size:9px;font-weight:600;">Maps API</span>';
+      if (src === 'document_upload') return '<span style="display:inline-block;padding:2px 8px;margin:2px;background:rgba(16,183,200,0.12);color:#0e8e9c;border-radius:999px;font-size:9px;font-weight:600;">Document</span>';
+      return `<span style="display:inline-block;padding:2px 8px;margin:2px;background:rgba(100,100,100,0.1);color:#666;border-radius:999px;font-size:9px;font-weight:600;">${src}</span>`;
+    })
+    .join('');
+
   return `
     <div style="max-width:272px;font-family:'Sora',sans-serif;font-size:13px;color:#1b2e55;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
         <div style="font-weight:700;line-height:1.3;">${asset.name}</div>
         ${hqBadge}
       </div>
-      <div style="margin-bottom:8px;">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:8px;">
         <span style="display:inline-block;padding:2px 9px;background:${color};color:white;border-radius:999px;font-size:10px;font-weight:600;">${catLabel}</span>
+        ${sourceChips}
       </div>
       <div style="color:#5f739f;font-size:11px;margin-bottom:6px;line-height:1.45;">${asset.address}</div>
       ${asset.description ? `<div style="font-size:11px;margin-bottom:6px;color:#42567f;line-height:1.4;">${asset.description}</div>` : ''}

@@ -64,12 +64,12 @@ async def enrich_assets(assets: List[FilteredAsset], company_name: str) -> List[
             enriched.append(
                 EnrichedAsset(
                     **asset.model_dump(),
-                    description=info.get("description", ""),
-                    size_estimate=info.get("size_estimate", "MEDIUM"),
-                    functional_tags=info.get("functional_tags", []),
-                    municipality=info.get("municipality", ""),
-                    province=info.get("province", ""),
-                    autonomous_community=info.get("autonomous_community", ""),
+                    description=info.get("description") or "",
+                    size_estimate=info.get("size_estimate") or "MEDIUM",
+                    functional_tags=info.get("functional_tags") or [],
+                    municipality=info.get("municipality") or "",
+                    province=info.get("province") or "",
+                    autonomous_community=info.get("autonomous_community") or "",
                     postal_code=info.get("postal_code"),
                 )
             )

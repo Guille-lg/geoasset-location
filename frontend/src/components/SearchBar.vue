@@ -8,6 +8,19 @@
       </p>
 
       <v-form class="hero-search" @submit.prevent="startAnalysis">
+        <!-- File cards above the input -->
+        <div v-if="store.uploadedFiles.length" class="file-cards-row">
+          <div v-for="(file, idx) in store.uploadedFiles" :key="idx" class="file-card">
+            <div class="file-card__info">
+              <span class="file-card__name">{{ file.name }}</span>
+              <span class="file-card__size">{{ formatFileSize(file.size) }}</span>
+            </div>
+            <button class="file-card__remove" @click.stop="store.removeUploadedFile(idx)" aria-label="Remove file">
+              <v-icon size="12">mdi-close</v-icon>
+            </button>
+          </div>
+        </div>
+
         <v-text-field
           v-model="searchText"
           clearable
@@ -18,62 +31,36 @@
           class="search-input px-3"
           @keydown.enter.prevent="startAnalysis"
         >
+          <template #prepend-inner>
+            <v-btn
+              icon
+              size="small"
+              variant="text"
+              class="upload-trigger"
+              aria-label="Upload files"
+              @click="openFilePicker"
+            >
+              <v-icon size="18">mdi-plus</v-icon>
+            </v-btn>
+          </template>
+
           <template #append>
-            <div class="search-actions">
-              <v-menu v-model="uploadMenuOpen" :close-on-content-click="false" location="bottom end" offset="10">
-                <template #activator="{ props }">
-                  <v-btn
-                    v-bind="props"
-                    icon
-                    size="small"
-                    variant="text"
-                    class="upload-trigger"
-                    aria-label="Open upload dialog"
-                  >
-                    <v-icon size="18">mdi-plus</v-icon>
-                  </v-btn>
-                </template>
-
-                <v-card class="upload-dialog" elevation="8">
-                  <div class="upload-dialog__title">Add files</div>
-                  <div class="upload-dialog__subtitle">Upload a company report to extract productive assets.</div>
-
-                  <v-text-field
-                    v-model="documentCompanyName"
-                    variant="outlined"
-                    density="comfortable"
-                    hide-details
-                    class="mt-3"
-                    label="Optional company name"
-                  />
-
-                  <div class="upload-dialog__meta mt-2">Accepted: PDF, DOCX, PPTX · Max {{ maxUploadLabel }}</div>
-
-                  <input
-                    ref="fileInputRef"
-                    type="file"
-                    accept=".pdf,.docx,.pptx"
-                    class="upload-dialog__input"
-                    @change="onFileInputChange"
-                  />
-
-                  <div class="upload-dialog__actions mt-4">
-                    <v-btn variant="outlined" color="primary" size="small" @click="openFilePicker">
-                      Choose file
-                    </v-btn>
-                    <span v-if="selectedFileName" class="upload-dialog__filename">{{ selectedFileName }}</span>
-                  </div>
-
-                  <div v-if="uploadError" class="upload-dialog__error mt-3">{{ uploadError }}</div>
-                </v-card>
-              </v-menu>
-
-              <v-btn icon size="small" color="primary" class="submit-icon" :disabled="!canSubmit" @click="startAnalysis">
-                <v-icon size="18">mdi-arrow-up</v-icon>
-              </v-btn>
-            </div>
+            <v-btn icon size="small" color="primary" class="submit-icon" :disabled="!canSubmit" @click="startAnalysis">
+              <v-icon size="18">mdi-arrow-up</v-icon>
+            </v-btn>
           </template>
         </v-text-field>
+
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept=".pdf,.docx,.pptx"
+          multiple
+          class="upload-input-hidden"
+          @change="onFileInputChange"
+        />
+
+        <div v-if="uploadError" class="upload-error-inline px-4 pb-3">{{ uploadError }}</div>
       </v-form>
 
       <div class="quick-picks mt-6">
@@ -99,17 +86,15 @@ import { useAppStore } from '@/stores/store';
 
 const store = useAppStore();
 const searchText = ref('');
-const documentCompanyName = ref('');
-const selectedFileName = ref('');
 const uploadError = ref('');
-const uploadMenuOpen = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const examples = ['Mercadona', 'Inditex', 'Repsol', 'Telefónica', 'Iberdrola', 'BBVA'];
 const MAX_UPLOAD_MB = 25;
 const ALLOWED_EXTENSIONS = new Set(['pdf', 'docx', 'pptx']);
 
-const canSubmit = computed(() => searchText.value.trim().length > 1);
-const maxUploadLabel = computed(() => `${MAX_UPLOAD_MB} MB`);
+const hasText = computed(() => searchText.value.trim().length > 1);
+const hasFiles = computed(() => store.uploadedFiles.length > 0);
+const canSubmit = computed(() => hasText.value || hasFiles.value);
 
 const slugify = (value: string): string =>
   value
@@ -118,15 +103,38 @@ const slugify = (value: string): string =>
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
 
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 const startAnalysis = () => {
+  if (!canSubmit.value) return;
+
   const name = searchText.value.trim();
-  if (!name) return;
+  const companyName = name || store.uploadedFiles[0]?.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim() || 'Uploaded Document';
+
   store.setCompany({
-    id: slugify(name) || 'company',
-    name,
+    id: slugify(companyName) || 'company',
+    name: companyName,
   });
-  store.setAnalysisMode('search');
-  store.resetAnalysis();
+
+  if (hasText.value && hasFiles.value) {
+    store.setAnalysisMode('combined');
+  } else if (hasFiles.value) {
+    store.setAnalysisMode('document');
+  } else {
+    store.setAnalysisMode('search');
+  }
+
+  store.pipelineSteps = [];
+  store.assets = [];
+  store.metadata = null;
+  store.selectedAssetId = null;
+  store.filterCategory = null;
+  store.filterMinConfidence = 0;
+  store.filterSource = null;
   store.setView('processing');
 };
 
@@ -134,8 +142,6 @@ const openFilePicker = () => {
   uploadError.value = '';
   fileInputRef.value?.click();
 };
-
-const parseFileNameToCompany = (fileName: string): string => fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
 
 const validateFile = (file: File): boolean => {
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
@@ -151,28 +157,14 @@ const validateFile = (file: File): boolean => {
   return true;
 };
 
-const startDocumentAnalysis = (file: File) => {
-  if (!validateFile(file)) return;
-
-  selectedFileName.value = file.name;
-  const companyName = documentCompanyName.value.trim() || parseFileNameToCompany(file.name) || 'Uploaded Document';
-
-  store.setCompany({
-    id: `doc_${slugify(companyName) || 'company'}`,
-    name: companyName,
-  });
-  store.setAnalysisMode('document');
-  store.resetAnalysis();
-  store.setUploadedFile(file);
-  uploadMenuOpen.value = false;
-  store.setView('processing');
-};
-
 const onFileInputChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (!file) return;
-  startDocumentAnalysis(file);
+  if (!target.files) return;
+  for (const file of Array.from(target.files)) {
+    if (validateFile(file)) {
+      store.addUploadedFile(file);
+    }
+  }
   target.value = '';
 };
 
@@ -284,51 +276,77 @@ const quickSearch = (name: string) => {
   color: #4b5f8f;
 }
 
-.upload-dialog {
-  width: min(360px, 92vw);
-  border-radius: 16px;
-  border: 1px solid rgba(87, 110, 156, 0.2);
-  background: rgba(255, 255, 255, 0.98);
-  padding: 0.95rem;
-}
-
-.upload-dialog__title {
-  font-weight: 700;
-  color: #152a54;
-}
-
-.upload-dialog__subtitle {
-  margin-top: 0.3rem;
-  font-size: 0.82rem;
-  color: #63759c;
-}
-
-.upload-dialog__meta {
-  font-size: 0.76rem;
-  color: #7b8caf;
-}
-
-.upload-dialog__input {
+.upload-input-hidden {
   display: none;
 }
 
-.upload-dialog__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-}
-
-.upload-dialog__filename {
-  font-size: 0.8rem;
-  color: #173671;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.upload-dialog__error {
+.upload-error-inline {
   font-size: 0.78rem;
   color: #ba1d3f;
+  text-align: left;
+}
+
+.file-cards-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.6rem 0.75rem 0;
+}
+
+.file-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 5vw;
+  min-width: 90px;
+  padding: 0.35rem 0.55rem;
+  border-radius: 12px;
+  border: 1px solid rgba(84, 124, 196, 0.22);
+  background: rgba(236, 243, 255, 0.85);
+}
+
+.file-card__info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-card__name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #173671;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.file-card__size {
+  font-size: 0.6rem;
+  color: #7b8caf;
+  line-height: 1.2;
+}
+
+.file-card__remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(186, 29, 63, 0.1);
+  color: #ba1d3f;
+  cursor: pointer;
+  transition: background 200ms;
+}
+
+.file-card__remove:hover {
+  background: rgba(186, 29, 63, 0.22);
 }
 
 .quick-picks {

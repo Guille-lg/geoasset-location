@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev libgl1-mesa-glx && \
+    build-essential libpq-dev libgl1-mesa-glx libglib2.0-0 && \
     rm -rf /var/lib/apt/lists/*
 
 RUN adduser --disabled-password --uid ${UID} ${USER} --home /home/${USER}
