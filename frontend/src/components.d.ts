@@ -7,6 +7,8 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    AgentDocumentReviewView: typeof import('./components/AgentDocumentReviewView.vue')['default']
+    AgentSearchView: typeof import('./components/AgentSearchView.vue')['default']
     AssetMap: typeof import('./components/AssetMap.vue')['default']
     AssetPopup: typeof import('./components/AssetPopup.vue')['default']
     AssetSidebar: typeof import('./components/AssetSidebar.vue')['default']

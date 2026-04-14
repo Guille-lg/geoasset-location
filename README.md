@@ -578,6 +578,10 @@ ANTHROPIC_API_KEY=...
 # LiteLLM
 LITELLM_MODEL=gpt-4o                 # Modelo por defecto
 LITELLM_FALLBACK_MODEL=claude-3-5-sonnet-20241022
+AGENT_LITELLM_MODEL=bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
+AGENT_LITELLM_FALLBACK_MODEL=
+PIPELINE_LITELLM_MODEL=bedrock/openai.gpt-oss-120b-1:0
+PIPELINE_LITELLM_FALLBACK_MODEL=
 LITELLM_MAX_WORKERS=5                # Workers paralelos máximos
 LITELLM_TIMEOUT=30                   # Timeout por llamada (s)
 

@@ -45,9 +45,28 @@
           </template>
 
           <template #append>
-            <v-btn icon size="small" color="primary" class="submit-icon" :disabled="!canSubmit" @click="startAnalysis">
-              <v-icon size="18">mdi-arrow-up</v-icon>
-            </v-btn>
+            <div class="search-actions">
+              <v-tooltip :text="store.agentMode ? 'Agentic search ON' : 'Enable agentic search'" location="top">
+                <template #activator="{ props: tooltipProps }">
+                  <v-btn
+                    v-bind="tooltipProps"
+                    icon
+                    size="small"
+                    :variant="store.agentMode ? 'flat' : 'text'"
+                    :color="store.agentMode ? 'deep-purple' : 'default'"
+                    class="agent-toggle"
+                    :class="{ 'agent-toggle--active': store.agentMode }"
+                    aria-label="Toggle agentic search"
+                    @click="store.toggleAgentMode()"
+                  >
+                    <v-icon size="18">mdi-robot-outline</v-icon>
+                  </v-btn>
+                </template>
+              </v-tooltip>
+              <v-btn icon size="small" color="primary" class="submit-icon" :disabled="!canSubmit" @click="startAnalysis">
+                <v-icon size="18">mdi-arrow-up</v-icon>
+              </v-btn>
+            </div>
           </template>
         </v-text-field>
 
@@ -135,7 +154,12 @@ const startAnalysis = () => {
   store.filterCategory = null;
   store.filterMinConfidence = 0;
   store.filterSource = null;
-  store.setView('processing');
+  store.clearAgentEvents();
+  store.agentFiles = [];
+  store.agentSessionId = null;
+
+  // If agent mode is enabled, go to agent view first; pipelines start after.
+  store.setView(store.agentMode ? 'agent' : 'processing');
 };
 
 const openFilePicker = () => {
@@ -269,6 +293,22 @@ const quickSearch = (name: string) => {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+  padding-right: 2px;
+}
+
+.agent-toggle {
+  border-radius: 999px;
+  transition: box-shadow 200ms, background 200ms;
+}
+
+.agent-toggle--active {
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25);
+  animation: agentPulse 2s ease-in-out infinite;
+}
+
+@keyframes agentPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25); }
+  50%       { box-shadow: 0 0 0 6px rgba(124, 58, 237, 0.1); }
 }
 
 .upload-trigger {

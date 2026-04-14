@@ -164,12 +164,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores/store';
-import { startAnalysisSSE, startDocumentAnalysisSSE } from '@/services/backend';
+import { startAnalysisSSE, startDocumentAnalysisSSE, startAgentDocumentAnalysisSSE } from '@/services/backend';
 import type { PipelineStep } from '@/types/types';
 
 const store = useAppStore();
 const errorMessage = ref('');
 const abortControllers: AbortController[] = [];
+const pendingSearchStreams = ref(0);
+const pendingDocStreams = ref(0);
 
 const DOC_STEP_OFFSET = 100;
 
@@ -199,9 +201,17 @@ const hasDoc = computed(() => store.analysisMode === 'document' || store.analysi
 
 const subtitleText = computed(() => {
   if (store.analysisMode === 'combined') {
-    return 'Running Maps API lookup and document extraction in parallel';
+    const hasAgentDocs = store.agentFiles.length > 0;
+    return hasAgentDocs
+      ? 'Running Maps API lookup and AI agent document extraction in parallel'
+      : 'Running Maps API lookup and document extraction in parallel';
   }
   if (store.analysisMode === 'document') {
+    const agentCount = store.agentFiles.length;
+    const uploadCount = store.uploadedFiles.length;
+    if (agentCount > 0 && uploadCount === 0) {
+      return `Extracting productive assets from ${agentCount} agent-found document${agentCount > 1 ? 's' : ''}`;
+    }
     const fName = store.uploadedFiles[0]?.name;
     return fName
       ? `Extracting productive assets from ${fName}`
@@ -259,7 +269,10 @@ const tryFinish = () => {
   store.setView('results');
 };
 
-const makeSearchEventHandler = () => (event: string, data: any) => {
+const makeSearchEventHandler = () => {
+  let settled = false;
+  return (event: string, data: any) => {
+    if (settled) return;
   if (event === 'step_start') {
     store.updateStep({ step: data.step, name: data.name, status: 'running', estimated_seconds: data.estimated_seconds });
   } else if (event === 'step_complete') {
@@ -272,14 +285,24 @@ const makeSearchEventHandler = () => (event: string, data: any) => {
     } else {
       store.setAssets(assets, metadata);
     }
-    searchComplete.value = true;
+    settled = true;
+    pendingSearchStreams.value = Math.max(0, pendingSearchStreams.value - 1);
+    searchComplete.value = pendingSearchStreams.value === 0;
     tryFinish();
   } else if (event === 'error') {
+    settled = true;
+    pendingSearchStreams.value = Math.max(0, pendingSearchStreams.value - 1);
+    searchComplete.value = pendingSearchStreams.value === 0;
     errorMessage.value = data.message || 'Error in search pipeline';
+    tryFinish();
   }
+  };
 };
 
-const makeDocEventHandler = () => (event: string, data: any) => {
+const makeDocEventHandler = () => {
+  let settled = false;
+  return (event: string, data: any) => {
+    if (settled) return;
   if (event === 'step_start') {
     store.updateStep({ step: data.step + DOC_STEP_OFFSET, name: data.name, status: 'running', estimated_seconds: data.estimated_seconds });
   } else if (event === 'step_complete') {
@@ -292,11 +315,18 @@ const makeDocEventHandler = () => (event: string, data: any) => {
     } else {
       store.setAssets(assets, metadata);
     }
-    docComplete.value = true;
+    settled = true;
+    pendingDocStreams.value = Math.max(0, pendingDocStreams.value - 1);
+    docComplete.value = pendingDocStreams.value === 0;
     tryFinish();
   } else if (event === 'error') {
+    settled = true;
+    pendingDocStreams.value = Math.max(0, pendingDocStreams.value - 1);
+    docComplete.value = pendingDocStreams.value === 0;
     errorMessage.value = data.message || 'Error in document pipeline';
+    tryFinish();
   }
+  };
 };
 
 const onError = (error: any) => {
@@ -311,6 +341,7 @@ const startAnalysis = () => {
   docComplete.value = false;
 
   if (hasSearch.value) {
+    pendingSearchStreams.value = 1;
     const ctrl = startAnalysisSSE(
       store.selectedCompany.id,
       store.selectedCompany.name,
@@ -323,7 +354,9 @@ const startAnalysis = () => {
     searchComplete.value = true;
   }
 
-  if (hasDoc.value && store.uploadedFiles.length > 0) {
+  const totalDocFiles = store.uploadedFiles.length + store.agentFiles.length;
+  if (hasDoc.value && totalDocFiles > 0) {
+    pendingDocStreams.value = totalDocFiles;
     for (const file of store.uploadedFiles) {
       const ctrl = startDocumentAnalysisSSE(
         file,
@@ -334,7 +367,18 @@ const startAnalysis = () => {
       );
       abortControllers.push(ctrl);
     }
+    for (const agentFile of store.agentFiles) {
+      const ctrl = startAgentDocumentAnalysisSSE(
+        agentFile,
+        store.selectedCompany.name,
+        true,
+        makeDocEventHandler(),
+        onError,
+      );
+      abortControllers.push(ctrl);
+    }
   } else {
+    pendingDocStreams.value = 0;
     docComplete.value = true;
   }
 };

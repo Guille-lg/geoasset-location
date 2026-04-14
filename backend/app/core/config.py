@@ -20,12 +20,21 @@ class Settings:
 
     LITELLM_MODEL: str = os.environ.get("LITELLM_MODEL", "bedrock/openai.gpt-oss-120b-1:0")
     LITELLM_FALLBACK_MODEL: str = os.environ.get("LITELLM_FALLBACK_MODEL", "")
+    AGENT_LITELLM_MODEL: str = os.environ.get("AGENT_LITELLM_MODEL", LITELLM_MODEL)
+    AGENT_LITELLM_FALLBACK_MODEL: str = os.environ.get("AGENT_LITELLM_FALLBACK_MODEL", LITELLM_FALLBACK_MODEL)
+    PIPELINE_LITELLM_MODEL: str = os.environ.get("PIPELINE_LITELLM_MODEL", LITELLM_MODEL)
+    PIPELINE_LITELLM_FALLBACK_MODEL: str = os.environ.get("PIPELINE_LITELLM_FALLBACK_MODEL", LITELLM_FALLBACK_MODEL)
     LITELLM_MAX_WORKERS: int = int(os.environ.get("LITELLM_MAX_WORKERS", "5"))
     LITELLM_TIMEOUT: int = int(os.environ.get("LITELLM_TIMEOUT", "30"))
 
     OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "")
     ANTHROPIC_API_KEY: str = os.environ.get("ANTHROPIC_API_KEY", "")
     AWS_REGION_NAME: str = os.environ.get("AWS_REGION_NAME", "eu-west-1")
+
+    AGENT_SESSION_DIR: str = os.environ.get("AGENT_SESSION_DIR", "/tmp/agent_sessions")
+    AGENT_MAX_DURATION_SECONDS: int = int(os.environ.get("AGENT_MAX_DURATION_SECONDS", "120"))
+    AGENT_MAX_FILES: int = int(os.environ.get("AGENT_MAX_FILES", "5"))
+    AGENT_MAX_ITERATIONS: int = int(os.environ.get("AGENT_MAX_ITERATIONS", "15"))
 
     CONFIDENCE_THRESHOLD_HIGH: float = float(os.environ.get("CONFIDENCE_THRESHOLD_HIGH", "0.65"))
     CONFIDENCE_THRESHOLD_MEDIUM: float = float(os.environ.get("CONFIDENCE_THRESHOLD_MEDIUM", "0.35"))

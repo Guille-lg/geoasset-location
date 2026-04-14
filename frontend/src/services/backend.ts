@@ -1,5 +1,13 @@
 import constants from '@/utils/const';
 import axios from 'axios';
+import type { AgentFile } from '@/types/types';
+
+export interface AgentDocumentMetadata {
+  filename: string
+  size: number
+  page_count: number | null
+  extension: string
+}
 
 const getBaseUrl = (): string => {
   let url = constants.backendHost;
@@ -95,16 +103,29 @@ export const startAnalysisSSE = (
         onError(new Error(`HTTP ${response.status}: ${text}`));
         return;
       }
-
       await consumeSSE(response, onEvent);
     })
     .catch((err) => {
-      if (err.name !== 'AbortError') {
-        onError(err);
-      }
+      if (err.name !== 'AbortError') onError(err);
     });
 
   return controller;
+};
+
+export const getAgentSessionDocumentUrl = (sessionId: string, filename: string): string => {
+  const safeFilename = encodeURIComponent(filename);
+  return getEndpoint(`/api/v1/agent/sessions/${sessionId}/documents/${safeFilename}`);
+};
+
+export const getAgentDocumentMetadata = async (
+  sessionId: string,
+  filename: string,
+): Promise<AgentDocumentMetadata> => {
+  const safeFilename = encodeURIComponent(filename);
+  const resp = await axios.get(
+    getEndpoint(`/api/v1/agent/sessions/${sessionId}/documents/${safeFilename}/metadata`),
+  );
+  return resp.data as AgentDocumentMetadata;
 };
 
 export const startDocumentAnalysisSSE = (
@@ -133,13 +154,84 @@ export const startDocumentAnalysisSSE = (
         onError(new Error(`HTTP ${response.status}: ${text}`));
         return;
       }
-
       await consumeSSE(response, onEvent);
     })
     .catch((err) => {
-      if (err.name !== 'AbortError') {
-        onError(err);
+      if (err.name !== 'AbortError') onError(err);
+    });
+
+  return controller;
+};
+
+/**
+ * Process an agent-downloaded document stored in the server's session directory.
+ * Passes session_id + agent_filename instead of uploading bytes.
+ */
+export const startAgentDocumentAnalysisSSE = (
+  agentFile: AgentFile,
+  companyName: string,
+  forceRefresh: boolean,
+  onEvent: (event: string, data: any) => void,
+  onError: (error: any) => void,
+): AbortController => {
+  const controller = new AbortController();
+  const url = getEndpoint('/api/v1/documents/analyze');
+
+  const formData = new FormData();
+  formData.append('session_id', agentFile.session_id);
+  formData.append('agent_filename', agentFile.filename);
+  formData.append('company_name', companyName);
+  formData.append('force_refresh', String(forceRefresh));
+  formData.append('source_override', 'agent_search');
+
+  fetch(url, {
+    method: 'POST',
+    body: formData,
+    signal: controller.signal,
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        const text = await response.text();
+        onError(new Error(`HTTP ${response.status}: ${text}`));
+        return;
       }
+      await consumeSSE(response, onEvent);
+    })
+    .catch((err) => {
+      if (err.name !== 'AbortError') onError(err);
+    });
+
+  return controller;
+};
+
+/**
+ * Start the agentic document search SSE stream.
+ */
+export const startAgentSearchSSE = (
+  companyId: string,
+  companyName: string,
+  onEvent: (event: string, data: any) => void,
+  onError: (error: any) => void,
+): AbortController => {
+  const controller = new AbortController();
+  const url = getEndpoint('/api/v1/agent/search');
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ company_id: companyId, company_name: companyName }),
+    signal: controller.signal,
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        const text = await response.text();
+        onError(new Error(`HTTP ${response.status}: ${text}`));
+        return;
+      }
+      await consumeSSE(response, onEvent);
+    })
+    .catch((err) => {
+      if (err.name !== 'AbortError') onError(err);
     });
 
   return controller;

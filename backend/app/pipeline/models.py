@@ -106,7 +106,7 @@ class EnrichedAsset(FilteredAsset):
 class ScoredAsset(EnrichedAsset):
     confidence_score: float = 0.0
     confidence_tier: str = "LOW"
-    data_sources: List[str] = Field(default_factory=lambda: ["google_maps", "llm_inference"])
+    data_sources: List[str] = Field(default_factory=lambda: ["maps_api", "llm_inference"])
 
 
 class Asset(BaseModel):
@@ -188,6 +188,18 @@ class DocumentScoredAsset(DocumentEnrichedAsset):
     confidence_score: float = 0.0
     confidence_tier: str = "LOW"
     data_sources: List[str] = Field(default_factory=lambda: ["document_upload", "llm_inference"])
+
+
+class AgentFoundFile(BaseModel):
+    filename: str
+    size: int
+    url: str
+    relevance_reason: str
+
+
+class AgentSearchRequest(BaseModel):
+    company_name: str
+    company_id: str
 
 
 class PipelineEvent(BaseModel):

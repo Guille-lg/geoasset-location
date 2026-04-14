@@ -21,6 +21,10 @@ dependencies = [
     "scipy>=1.13.0",
     "python-multipart>=0.0.9",
     "docling>=2.0.0",
+    "crewai>=0.80.0",
+    "mcp>=1.0.0",
+    "duckduckgo-mcp-server>=0.1.0",
+    "pdfplumber>=0.11.0",
 ]
 
 [build-system]

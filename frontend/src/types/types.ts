@@ -117,8 +117,35 @@ export interface AnalysisMetadata {
   last_updated?: string
 }
 
-export type AssetSource = 'maps_api' | 'document_upload'
+export type AssetSource = 'maps_api' | 'document_upload' | 'agent_search'
 
 export type AnalysisMode = 'search' | 'document' | 'combined'
 
-export type AppView = 'search' | 'processing' | 'results'
+export type AppView = 'search' | 'agent' | 'agent_review' | 'processing' | 'results'
+
+export interface AgentFile {
+  filename: string
+  size: number
+  url: string
+  relevance_reason: string
+  session_id: string
+  extension?: string
+  page_count?: number | null
+}
+
+export type AgentEventType =
+  | 'thinking'
+  | 'searching'
+  | 'found_urls'
+  | 'downloading'
+  | 'accepted'
+  | 'rejected'
+  | 'error'
+
+export interface AgentEvent {
+  type: AgentEventType
+  content: string
+  filename?: string
+  url?: string
+  timestamp: number
+}

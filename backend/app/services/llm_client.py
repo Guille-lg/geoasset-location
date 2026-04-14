@@ -24,9 +24,11 @@ def get_semaphore() -> asyncio.Semaphore:
 async def llm_completion(messages: list, temperature: float = 0.1, max_tokens: int = 4096) -> Optional[str]:
     sem = get_semaphore()
     async with sem:
+        model = settings.PIPELINE_LITELLM_MODEL
+        fallback_model = settings.PIPELINE_LITELLM_FALLBACK_MODEL
         try:
             response = await litellm.acompletion(
-                model=settings.LITELLM_MODEL,
+                model=model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -37,10 +39,10 @@ async def llm_completion(messages: list, temperature: float = 0.1, max_tokens: i
             return response.choices[0].message.content
         except Exception as e:
             logger.error(f"LLM error: {e}")
-            if settings.LITELLM_FALLBACK_MODEL:
+            if fallback_model:
                 try:
                     response = await litellm.acompletion(
-                        model=settings.LITELLM_FALLBACK_MODEL,
+                        model=fallback_model,
                         messages=messages,
                         temperature=temperature,
                         max_tokens=max_tokens,

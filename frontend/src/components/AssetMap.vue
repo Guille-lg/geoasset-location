@@ -42,9 +42,29 @@ const TILE_LAYERS: Record<string, { url: string; attribution: string }> = {
   },
 };
 
-function createMarkerIcon(category: string, tier: string): L.DivIcon {
-  const color = CATEGORY_COLORS[category as AssetCategory] || '#9E9E9E';
-  const opacity = tier === 'LOW' ? '0.5' : '1';
+// Source color palette — distinct from category colors so the map legend is unambiguous.
+const SOURCE_COLORS: Record<string, string> = {
+  maps_api: '#2c6fff',        // blue
+  document_upload: '#10b7c8', // teal
+  agent_search: '#8b5cf6',    // purple
+};
+const SOURCE_LABELS: Record<string, string> = {
+  maps_api: 'Maps API',
+  document_upload: 'Document',
+  agent_search: 'Agent Search',
+};
+
+function resolveSourceColor(dataSources: string[]): string {
+  // Priority: agent_search > document_upload > maps_api > fallback grey
+  if (dataSources.includes('agent_search')) return SOURCE_COLORS.agent_search;
+  if (dataSources.includes('document_upload')) return SOURCE_COLORS.document_upload;
+  if (dataSources.includes('maps_api')) return SOURCE_COLORS.maps_api;
+  return '#9E9E9E';
+}
+
+function createMarkerIcon(dataSources: string[], tier: string): L.DivIcon {
+  const color = resolveSourceColor(dataSources);
+  const opacity = tier === 'LOW' ? '0.55' : '1';
   const size = tier === 'HIGH' ? 14 : 10;
   return L.divIcon({
     className: 'custom-marker',
@@ -75,11 +95,17 @@ function buildPopupContent(asset: Asset): string {
     ? '<span style="display:inline-block;padding:2px 8px;margin-left:6px;background:#fef4cc;color:#8c6a00;border-radius:999px;font-size:10px;font-weight:600;">HQ</span>'
     : '';
 
+  const sourceChipStyles: Record<string, string> = {
+    maps_api:        'background:rgba(44,111,255,0.12);color:#2c6fff;',
+    document_upload: 'background:rgba(16,183,200,0.12);color:#0e8e9c;',
+    agent_search:    'background:rgba(139,92,246,0.12);color:#8b5cf6;',
+  };
   const sourceChips = (asset.data_sources || [])
+    .filter((src: string) => !src.includes('inference'))
     .map((src: string) => {
-      if (src === 'maps_api') return '<span style="display:inline-block;padding:2px 8px;margin:2px;background:rgba(44,111,255,0.12);color:#2c6fff;border-radius:999px;font-size:9px;font-weight:600;">Maps API</span>';
-      if (src === 'document_upload') return '<span style="display:inline-block;padding:2px 8px;margin:2px;background:rgba(16,183,200,0.12);color:#0e8e9c;border-radius:999px;font-size:9px;font-weight:600;">Document</span>';
-      return `<span style="display:inline-block;padding:2px 8px;margin:2px;background:rgba(100,100,100,0.1);color:#666;border-radius:999px;font-size:9px;font-weight:600;">${src}</span>`;
+      const style = sourceChipStyles[src] || 'background:rgba(100,100,100,0.1);color:#666;';
+      const label = SOURCE_LABELS[src] || src;
+      return `<span style="display:inline-block;padding:2px 8px;margin:2px;${style}border-radius:999px;font-size:9px;font-weight:600;">${label}</span>`;
     })
     .join('');
 
@@ -127,7 +153,7 @@ function addMarkers() {
 
   for (const asset of assets) {
     const marker = L.marker([asset.latitude, asset.longitude], {
-      icon: createMarkerIcon(asset.category, asset.confidence_tier),
+      icon: createMarkerIcon(asset.data_sources || [], asset.confidence_tier),
     });
     marker.bindPopup(buildPopupContent(asset), { maxWidth: 280 });
     marker.on('click', () => {
@@ -178,6 +204,25 @@ onMounted(() => {
   }
 
   L.control.layers(baseLayers).addTo(map);
+
+  // Source legend
+  const legend = new (L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd() {
+      const div = L.DomUtil.create('div', 'source-legend');
+      div.innerHTML = Object.entries(SOURCE_COLORS)
+        .map(
+          ([key, color]) =>
+            `<div class="source-legend-row">
+              <span class="source-legend-dot" style="background:${color}"></span>
+              <span>${SOURCE_LABELS[key]}</span>
+            </div>`,
+        )
+        .join('');
+      return div;
+    },
+  }))();
+  legend.addTo(map);
 
   nextTick(() => addMarkers());
 });
@@ -246,5 +291,33 @@ onUnmounted(() => {
 .leaflet-control-layers-expanded {
   background: rgba(255, 255, 255, 0.94) !important;
   color: #223a69 !important;
+}
+
+.source-legend {
+  background: rgba(255, 255, 255, 0.93);
+  border: 1px solid rgba(108, 141, 200, 0.28);
+  border-radius: 12px;
+  padding: 0.55rem 0.8rem;
+  box-shadow: 0 8px 20px rgba(19, 52, 118, 0.1);
+  font-family: 'Sora', sans-serif;
+  font-size: 11px;
+  color: #223a69;
+  min-width: 120px;
+}
+
+.source-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 0;
+}
+
+.source-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 </style>

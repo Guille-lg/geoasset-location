@@ -88,9 +88,17 @@ def _compute_confidence(asset: DocumentEnrichedAsset) -> float:
     return round(beta_dist.mean(alpha, beta_param), 3)
 
 
-async def score_document_assets(assets: List[DocumentEnrichedAsset]) -> List[DocumentScoredAsset]:
+async def score_document_assets(
+    assets: List[DocumentEnrichedAsset],
+    source_override: str | None = None,
+) -> List[DocumentScoredAsset]:
     scored: List[DocumentScoredAsset] = []
 
+    data_sources = (
+        [source_override, "llm_inference"]
+        if source_override
+        else ["document_upload", "llm_inference"]
+    )
     for asset in assets:
         score = _compute_confidence(asset)
         scored.append(
@@ -98,6 +106,7 @@ async def score_document_assets(assets: List[DocumentEnrichedAsset]) -> List[Doc
                 **asset.model_dump(),
                 confidence_score=score,
                 confidence_tier=_confidence_tier(score),
+                data_sources=data_sources,
             )
         )
 

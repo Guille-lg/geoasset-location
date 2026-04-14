@@ -2,8 +2,10 @@
   <v-app>
     <v-layout class="app-shell">
       <Header />
-      <v-main :class="['app-main', { 'app-main--fullbleed': store.currentView === 'search' || store.currentView === 'processing' }]">
+      <v-main :class="['app-main', { 'app-main--fullbleed': store.currentView === 'search' || store.currentView === 'agent' || store.currentView === 'agent_review' || store.currentView === 'processing' }]">
         <SearchBar v-if="store.currentView === 'search'" />
+        <AgentSearchView v-else-if="store.currentView === 'agent'" />
+        <AgentDocumentReviewView v-else-if="store.currentView === 'agent_review'" />
         <ProcessingView v-else-if="store.currentView === 'processing'" />
         <section v-else-if="store.currentView === 'results'" class="results-view">
           <div class="results-grid">
@@ -25,6 +27,8 @@ import { ref } from 'vue';
 import { useAppStore } from '@/stores/store';
 import Header from '@/components/Header.vue';
 import SearchBar from '@/components/SearchBar.vue';
+import AgentSearchView from '@/components/AgentSearchView.vue';
+import AgentDocumentReviewView from '@/components/AgentDocumentReviewView.vue';
 import ProcessingView from '@/components/ProcessingView.vue';
 import AssetSidebar from '@/components/AssetSidebar.vue';
 import AssetMap from '@/components/AssetMap.vue';
@@ -77,6 +81,8 @@ html {
 }
 
 .app-main--fullbleed .search-page,
+.app-main--fullbleed .agent-page,
+.app-main--fullbleed .agent-review-page,
 .app-main--fullbleed .processing-page {
   box-sizing: border-box;
   padding-top: var(--topbar-height);

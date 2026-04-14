@@ -84,6 +84,16 @@
           <v-icon start size="12">mdi-file-document-outline</v-icon>
           Document ({{ store.sourceCounts['document_upload'] }})
         </v-chip>
+        <v-chip
+          v-if="store.sourceCounts['agent_search']"
+          size="x-small"
+          :variant="store.filterSource === 'agent_search' ? 'flat' : 'outlined'"
+          color="deep-purple"
+          @click="store.filterSource = store.filterSource === 'agent_search' ? null : 'agent_search'"
+        >
+          <v-icon start size="12">mdi-robot-outline</v-icon>
+          Agent ({{ store.sourceCounts['agent_search'] }})
+        </v-chip>
       </div>
     </div>
 
@@ -107,14 +117,14 @@
         <template #append>
           <div class="d-flex align-center ga-1">
             <v-chip
-              v-for="src in (asset.data_sources || [])"
+              v-for="src in (asset.data_sources || []).filter(s => !s.includes('inference'))"
               :key="src"
               size="x-small"
-              :color="src === 'maps_api' ? 'blue' : src === 'document_upload' ? 'teal' : 'grey'"
+              :color="src === 'maps_api' ? 'blue' : src === 'document_upload' ? 'teal' : src === 'agent_search' ? 'deep-purple' : 'grey'"
               variant="tonal"
               class="source-chip"
             >
-              <v-icon size="10">{{ src === 'maps_api' ? 'mdi-google-maps' : 'mdi-file-document-outline' }}</v-icon>
+              <v-icon size="10">{{ src === 'maps_api' ? 'mdi-google-maps' : src === 'agent_search' ? 'mdi-robot-outline' : 'mdi-file-document-outline' }}</v-icon>
             </v-chip>
             <v-chip :color="getTierColor(asset.confidence_tier)" size="x-small" variant="tonal">
               {{ (asset.confidence_score * 100).toFixed(0) }}%

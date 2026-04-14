@@ -52,6 +52,7 @@ async def run_doc_pipeline_sse(
     file_name: str,
     file_bytes: bytes,
     force_refresh: bool,
+    source_override: str | None = None,
 ) -> AsyncGenerator[str, None]:
     job_id = str(uuid.uuid4())
 
@@ -111,7 +112,7 @@ async def run_doc_pipeline_sse(
         yield sse_event("step_complete", {"step": 4, "name": "Geocoding complete", "found": len(geocoded)})
 
         yield sse_event("step_start", {"step": 5, "name": "Scoring confidence", "estimated_seconds": 2})
-        scored = await score_document_assets(geocoded)
+        scored = await score_document_assets(geocoded, source_override=source_override)
         yield sse_event("step_complete", {"step": 5, "name": "Scoring complete", "found": len(scored)})
 
         assets = [_doc_scored_to_asset(asset, company_id) for asset in scored]

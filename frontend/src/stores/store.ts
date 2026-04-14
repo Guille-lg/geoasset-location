@@ -1,5 +1,14 @@
 import { defineStore } from 'pinia';
-import type { Asset, Company, PipelineStep, AnalysisMetadata, AppView, AnalysisMode } from '@/types/types';
+import type {
+  Asset,
+  Company,
+  PipelineStep,
+  AnalysisMetadata,
+  AppView,
+  AnalysisMode,
+  AgentFile,
+  AgentEvent,
+} from '@/types/types';
 
 export interface AppState {
   currentView: AppView;
@@ -16,6 +25,11 @@ export interface AppState {
   analysisMode: AnalysisMode;
   uploadedFiles: File[];
   filterSource: string | null;
+  // Agent state
+  agentMode: boolean;
+  agentFiles: AgentFile[];
+  agentEvents: AgentEvent[];
+  agentSessionId: string | null;
 }
 
 export const useAppStore = defineStore('app', {
@@ -34,6 +48,10 @@ export const useAppStore = defineStore('app', {
     analysisMode: 'search',
     uploadedFiles: [],
     filterSource: null,
+    agentMode: false,
+    agentFiles: [],
+    agentEvents: [],
+    agentSessionId: null,
   }),
   getters: {
     filteredAssets(state): Asset[] {
@@ -80,6 +98,12 @@ export const useAppStore = defineStore('app', {
     setAnalysisMode(mode: AnalysisMode) {
       this.analysisMode = mode;
     },
+    toggleAgentMode() {
+      this.agentMode = !this.agentMode;
+    },
+    setAgentMode(val: boolean) {
+      this.agentMode = val;
+    },
     addUploadedFile(file: File) {
       this.uploadedFiles.push(file);
     },
@@ -112,6 +136,9 @@ export const useAppStore = defineStore('app', {
       this.filterMinConfidence = 0;
       this.filterSource = null;
       this.uploadedFiles = [];
+      this.agentFiles = [];
+      this.agentEvents = [];
+      this.agentSessionId = null;
     },
     updateStep(step: PipelineStep) {
       const idx = this.pipelineSteps.findIndex((s) => s.step === step.step);
@@ -123,6 +150,22 @@ export const useAppStore = defineStore('app', {
     },
     selectAsset(id: string | null) {
       this.selectedAssetId = id;
+    },
+    setAgentFiles(files: AgentFile[]) {
+      this.agentFiles = files;
+    },
+    setAgentSessionId(id: string) {
+      this.agentSessionId = id;
+    },
+    addAgentEvent(event: AgentEvent) {
+      this.agentEvents.push(event);
+      // Keep last 200 events to avoid memory bloat
+      if (this.agentEvents.length > 200) {
+        this.agentEvents.shift();
+      }
+    },
+    clearAgentEvents() {
+      this.agentEvents = [];
     },
   },
 });
